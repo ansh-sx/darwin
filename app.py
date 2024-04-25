@@ -1,11 +1,12 @@
+from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 from sumy.parsers.html import HtmlParser
 from sumy.nlp.tokenizers import Tokenizer
 from sumy.summarizers.lsa import LsaSummarizer
 from sumy.utils import get_stop_words
-from PIL import Image
-from io import BytesIO
+
+app = Flask(__name__)
 
 def fetch_content(url):
     try:
@@ -38,6 +39,27 @@ def fetch_content(url):
         print(f"Error fetching content from {url}: {e}")
         return None, None, None, None
 
+@app.route('/fetch_data', methods=['POST'])
+def fetch_data():
+    data = request.json
+    query = data['query']
+    max_urls = data.get('max_urls', 10)
+
+    urls = fetch_urls(query, max_urls)
+    response_data = []
+
+    for url in urls:
+        content, summary, images, videos = fetch_content(url)
+        if content:
+            response_data.append({
+                'url': url,
+                'summary': [str(sentence) for sentence in summary],
+                'images': images,
+                'videos': videos
+            })
+
+    return jsonify(response_data)
+
 def fetch_urls(query, max_urls=10):
     search_url = f"https://www.google.com/search?q={query}"
     response = requests.get(search_url)
@@ -54,16 +76,5 @@ def fetch_urls(query, max_urls=10):
 
     return urls[:max_urls]
 
-# Example usage:
-query = input("Enter your search query: ")
-urls = fetch_urls(query, max_urls=10)
-print("Related URLs:")
-for url in urls:
-    content, summary, images, videos = fetch_content(url)
-    if content:
-        print("\nURL:", url)
-        print("Summary:")
-        for sentence in summary:
-            print(sentence)
-        print("Images:", images)
-        print("Videos:", videos)
+if __name__ == '__main__':
+    app.run(debug=True)
